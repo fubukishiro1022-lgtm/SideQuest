@@ -1,7 +1,7 @@
 /* SideQuest · open-play queue manager. Single classic script; sections are marked with // ---------- ... ---------- */
 
 const cloudConfig=window.SQ_SUPABASE||{};
-const cloudReady=!!(window.supabase&&cloudConfig.url&&cloudConfig.anonKey);
+const cloudReady=!new URLSearchParams(location.search).has('local')&&!!(window.supabase&&cloudConfig.url&&cloudConfig.anonKey);
 const cloud=cloudReady?window.supabase.createClient(cloudConfig.url,cloudConfig.anonKey):null;
 let cloudClub=null,cloudTimer=null,cloudChannel=null,adminChannel=null,cloudUser=null,lastCloudFingerprint='';
 

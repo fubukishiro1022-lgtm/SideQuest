@@ -26,7 +26,7 @@ const club = (slug = 'test-club', extra = {}) => ({ ...SEEN, sq_me: JSON.stringi
       try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async t => { window.__clip.push(t); } }, configurable: true }); } catch (e) {}
       if (pre && !localStorage.getItem('__pre')) { for (const [k, v] of Object.entries(pre)) localStorage.setItem(k, v); localStorage.setItem('__pre', '1'); }
     }, pre);
-    await pg.goto(URL + hash);
+    await pg.goto(URL + '?local=1' + hash);
     await pg.waitForTimeout(500);
     return { ctx, pg, errs, external, csp, E: (f, a) => pg.evaluate(f, a) };
   }
@@ -38,7 +38,7 @@ const club = (slug = 'test-club', extra = {}) => ({ ...SEEN, sq_me: JSON.stringi
   };
 
   console.log('--- project files');
-  const need = ['index.html', 'assets/app.js', 'assets/styles.css', 'manifest.webmanifest', 'sw.js', 'vercel.json', '404.html', 'robots.txt', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'vendor/qrcode.js', 'README.md', 'LICENSE', 'package.json'];
+  const need = ['index.html', 'assets/app.js', 'assets/config.js', 'supabase/schema.sql', 'assets/styles.css', 'manifest.webmanifest', 'sw.js', 'vercel.json', '404.html', 'robots.txt', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'vendor/qrcode.js', 'README.md', 'LICENSE', 'package.json'];
   ck('all required files exist', need.every(f => fs.existsSync(path.join(ROOT, f))));
   const man = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
   ck('manifest icons all exist', man.icons.every(i => fs.existsSync(path.join(ROOT, i.src))));
@@ -98,7 +98,7 @@ const club = (slug = 'test-club', extra = {}) => ({ ...SEEN, sq_me: JSON.stringi
   await D.E(() => { add('Private Person', 3, false); draw(); setTimeout(() => { throw new Error('boom test 123'); }, 0); }); await D.pg.waitForTimeout(300);
   await D.E(() => diagM()); await D.pg.waitForTimeout(200);
   const dg = await D.E(() => document.querySelector('#dgt').value);
-  ck('problem report has version + error but no player names', dg.includes('1.0.0') && dg.includes('boom test 123') && !dg.includes('Private Person'));
+  ck('problem report has version + error but no player names', dg.includes('1.1.0') && dg.includes('boom test 123') && !dg.includes('Private Person'));
   await D.E(() => closeM());
   await D.pg.click('nav.side button:has-text("Help")'); await D.pg.waitForTimeout(250);
   ck('Help dialog is there', await D.E(() => document.querySelectorAll('.md details').length >= 7 && !document.querySelector('.md').textContent.includes('pilot')));

@@ -23,8 +23,12 @@
 <div id="root"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="vendor/qrcode.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/config.js"></script>
+<script>
+if (!new URLSearchParams(location.search).has('local') && window.SQ_SUPABASE && window.SQ_SUPABASE.url && window.SQ_SUPABASE.anonKey) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0"><\/script>');
+}
+</script>
 <script src="assets/app.js"></script>
 </body>
 </html>
