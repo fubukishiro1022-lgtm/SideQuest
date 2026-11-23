@@ -57,6 +57,9 @@ grant select, insert, update on public.club_data to authenticated;
 grant select on public.public_queues to anon, authenticated;
 grant insert, update on public.public_queues to authenticated;
 
+-- API roles need only the CRUD rights above; they do not need table-level maintenance privileges.
+revoke truncate, references, trigger, maintain on table public.club_accounts, public.club_data, public.public_queues from anon, authenticated;
+
 do $$ begin
   alter publication supabase_realtime add table public.public_queues;
 exception when duplicate_object then null;
