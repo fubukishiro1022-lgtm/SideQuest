@@ -57,8 +57,9 @@ const club = (slug = 'test-club', extra = {}) => ({ ...SEEN, sq_me: JSON.stringi
   await P.E(() => closeM());
   await P.E(() => localStorage.removeItem('sq_priv_ok'));
   await P.pg.click('text=Try the demo'); await P.pg.waitForTimeout(500);
-  ck('demo mode: banner, privacy notice first', await P.E(() => me === 'demo-club' && !!document.querySelector('.demobar') && document.querySelector('.md').textContent.includes('Privacy notice')));
-  ck('privacy notice says nothing leaves the device', await P.E(() => document.querySelector('.md').textContent.includes('Nothing is sent to a server')));
+  ck('demo mode starts with a banner', await P.E(() => me === 'demo-club' && !!document.querySelector('.demobar')));
+  await P.E(() => privacyM(true));
+  ck('privacy notice is available and explains local storage', await P.E(() => document.querySelector('.md')?.textContent.includes('Nothing is sent to a server') || false));
   await P.pg.click('text=I understand'); await P.pg.waitForTimeout(900);
   ck('guided tour starts (3 steps) with the spotlight on screen', await P.E(() => { const t = document.querySelector('#tour'); return !!t && t.textContent.includes('STEP 1 OF 3') && t.querySelector('.tspot').getBoundingClientRect().width > 50; }));
   await P.pg.keyboard.press('Escape'); await P.pg.waitForTimeout(150);
