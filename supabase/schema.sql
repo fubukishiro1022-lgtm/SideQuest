@@ -44,7 +44,9 @@ drop policy if exists "owners update club data" on public.club_data;
 create policy "owners update club data" on public.club_data for update to authenticated using (exists (select 1 from public.club_accounts c where c.id = club_id and c.owner_id = auth.uid())) with check (exists (select 1 from public.club_accounts c where c.id = club_id and c.owner_id = auth.uid()));
 
 drop policy if exists "public can read shared queue" on public.public_queues;
-create policy "public can read shared queue" on public.public_queues for select to anon, authenticated using (exists (select 1 from public.club_accounts c where c.id = club_id and c.public_enabled));
+-- Rows in public_queues exist only after the organizer shares the player link.
+-- Do not query club_accounts here: its RLS intentionally hides that table from anon.
+create policy "public can read shared queue" on public.public_queues for select to anon, authenticated using (true);
 drop policy if exists "owners publish queue" on public.public_queues;
 create policy "owners publish queue" on public.public_queues for insert to authenticated with check (exists (select 1 from public.club_accounts c where c.id = club_id and c.owner_id = auth.uid() and c.public_enabled and c.slug = public_queues.slug));
 drop policy if exists "owners update queue" on public.public_queues;
