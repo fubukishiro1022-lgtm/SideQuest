@@ -53,8 +53,9 @@ const club = (slug = 'test-club', extra = {}) => ({ ...SEEN, sq_me: JSON.stringi
   ck('there is no email field and no fake password reset', await P.E(() => !document.querySelector('#ae') && !document.querySelector('#root').textContent.includes('Recovery')));
   await P.E(() => { am = 'old'; auth(); });
   await P.pg.click('text=Forgot password?');
-  ck('"Forgot password?" is honest (no email is sent)', await P.E(() => document.querySelector('.md').textContent.includes('can’t be emailed')));
+  ck('"Forgot password?" is honest (no email is sent)', await P.E(() => document.querySelector('.md')?.textContent.includes('no password reset service') || false));
   await P.E(() => closeM());
+  await P.E(() => localStorage.removeItem('sq_priv_ok'));
   await P.pg.click('text=Try the demo'); await P.pg.waitForTimeout(500);
   ck('demo mode: banner, privacy notice first', await P.E(() => me === 'demo-club' && !!document.querySelector('.demobar') && document.querySelector('.md').textContent.includes('Privacy notice')));
   ck('privacy notice says nothing leaves the device', await P.E(() => document.querySelector('.md').textContent.includes('Nothing is sent to a server')));
