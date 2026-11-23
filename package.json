@@ -1,8 +1,8 @@
 {
   "name": "sidequest",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Open-play queue manager for pickleball clubs: fair matching, live scoring, a TV Live View and results. Runs entirely in the browser.",
+  "description": "Open-play queue manager for pickleball clubs: fair matching, live scoring, optional Supabase sync, shareable player queues, and results.",
   "license": "MIT",
   "scripts": {
     "start": "node tests/serve.js",

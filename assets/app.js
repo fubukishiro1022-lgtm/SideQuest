@@ -1,5 +1,10 @@
 /* SideQuest · open-play queue manager. Single classic script; sections are marked with // ---------- ... ---------- */
 
+const cloudConfig=window.SQ_SUPABASE||{};
+const cloudReady=!!(window.supabase&&cloudConfig.url&&cloudConfig.anonKey);
+const cloud=cloudReady?window.supabase.createClient(cloudConfig.url,cloudConfig.anonKey):null;
+let cloudClub=null,cloudTimer=null,cloudChannel=null,adminChannel=null,cloudUser=null,lastCloudFingerprint='';
+
 const $=s=>document.querySelector(s),P=n=>'₱'+Math.round(n).toLocaleString();
 const ls={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let toastT;function toast(m,ms){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),ms||2200)}
@@ -10,22 +15,44 @@ const svg=k=>`<svg viewBox="0 0 24 24">${IC[k]}</svg>`;
 let clubs=ls.get('sq_clubs')||{},me=null,am='new',slugTouched=false;
 async function boot(){try{const th=ls.get('sq_theme');if(th==='light'||th==='dark')document.documentElement.dataset.theme=th}catch(e){}
 document.title=BRAND[0]+BRAND[1]+' · Run your whole club';
+const qs=new URLSearchParams(location.search);if(qs.has('queue')){await playerBoot(qs.get('queue'));return}
 const mh=/^#club-([a-z0-9-]+)$/.exec(location.hash);if(mh)PRE=mh[1];
 if(location.hash==='#tv'){tvBoot();return}
+ if(cloudReady){const{data:{session}}=await cloud.auth.getSession();if(session){cloudUser=session.user;if(location.hash.includes('type=recovery')){passwordResetView();return}await cloudEnter(session.user);return}auth();return}
 const s=ls.get('sq_me');if(s&&clubs[s]){me=s;loadState(s);app();if(S.phase=='live')toast('Session restored');if(location.hash==='#kiosk'){S.ov='kiosk';draw()}firstRun()}
 else{if(PRE)am='old';auth();if(PRE){const e=$('#as');if(e)e.value=PRE;const q=$('#ap');if(q)q.focus()}}}
 const slugify=s=>s.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 function auth(){const n=am=='new';$('#root').innerHTML=`<main class="auth"><div class="in"><div class="logo">${brandHTML()}</div><h1>Run your whole club <span>from one screen.</span></h1><p class="mu" style="max-width:460px">Open-play queues, fair matching, live scoring and results. Built for pickleball clubs.</p><div class="court"><div class="ball"></div></div></div>
 <div class="card in" style="--i:2;padding:22px"><div class="seg ${n?'':'r'}"><b></b><button class="${n?'on':''}" onclick="am='new';auth()">New Club</button><button class="${n?'':'on'}" onclick="am='old';auth()">Existing Club</button></div>
-<h2 style="margin:18px 0 2px;font-size:22px">${n?'Create your club':'Welcome back'}</h2><p class="mu" style="margin:0">${n?'Save your club online so staff can use it on any phone or tablet.':'Log in with your club link and password.'}</p>
+<h2 style="margin:18px 0 2px;font-size:22px">${n?'Create your club':'Welcome back'}</h2><p class="mu" style="margin:0">${cloudReady?(n?'Create an organizer account and sync your club online.':'Log in to manage your club from any device.'):(n?'Your club is stored in this browser only. Configure Supabase to sync across devices.':'Log in with your club link and password.')}</p>
 ${n?`<label for="an">Club Name</label><input id="an" placeholder="e.g., Sunday Open Play" oninput="if(!slugTouched)$('#as').value=slugify(this.value)"><div class="err" id="e-n"></div>
 `:''}
-<label for="as">Club Link</label><div class="hint">Staff use this to log in.</div><div class="slug"><span class="mono">#club-</span><input id="as" class="mono" placeholder="your-club" oninput="slugTouched=true"></div><div class="err" id="e-s"></div>
-<label for="ap">Club Password</label><input id="ap" type="password" placeholder="${n?'Create a password (8+ characters)':'Enter your password'}" onkeydown="if(event.key=='Enter')go()"><div class="err" id="e-p"></div>
+${cloudReady?'<label for="ae">Organizer Email</label><input id="ae" type="email" autocomplete="email" placeholder="you@example.com"><div class="err" id="e-e"></div>':''}
+${cloudReady&&!n?'':`<label for="as">Club Link</label><div class="hint">${cloudReady?'This will be part of your player queue link.':'Staff use this to log in.'}</div><div class="slug"><span class="mono">#club-</span><input id="as" class="mono" placeholder="your-club" oninput="slugTouched=true"></div><div class="err" id="e-s"></div>`}
+<label for="ap">${cloudReady?'Password':'Club Password'}</label><input id="ap" type="password" autocomplete="${n?'new-password':'current-password'}" placeholder="${n?'Create a password (8+ characters)':'Enter your password'}" onkeydown="if(event.key=='Enter')go()"><div class="err" id="e-p"></div>
 <button class="btn" style="width:100%;margin-top:4px" onclick="go()">${n?'Create club':'Log in'}</button>
 <div class="row" style="margin-top:14px;font-size:13px"><button class="btn g sm" onclick="enterDemo()">Try the demo</button><span class="sp"></span>${n?'':'<button style="background:none;border:0;color:var(--ac)" onclick="forgot()">Forgot password?</button>'}</div><div class="row" style="margin-top:6px;justify-content:center"><button class="lnk" onclick="privacyM()">Privacy</button><span class="mu">·</span><button class="lnk" onclick="helpM()">Help</button></div></div></main>`}
 function fe(id,m){$('#e-'+id).textContent=m||'';return !m}
-async function go(){const n=am=='new',s=slugify($('#as').value),p=$('#ap').value;let ok=true;
+async function go(){const n=am=='new',s=slugify($('#as')?.value||''),p=$('#ap').value;let ok=true;
+if(cloudReady){
+ const email=$('#ae').value.trim().toLowerCase();
+ ok=fe('e',/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)?'':'Enter a valid organizer email.')&ok;
+ if(n){const nm=$('#an').value.trim();ok=fe('n',nm?'':'Enter a club name.')&ok;ok=fe('s',s.length<3?'Use at least 3 letters or numbers.':'')&ok}
+ ok=fe('p',p.length>=8?'':'Use at least 8 characters.')&ok;if(!ok)return;
+ const nm=n?$('#an').value.trim():'';
+ const result=n?await cloud.auth.signUp({email,password:p,options:{data:{club_name:nm,club_slug:s}}}):await cloud.auth.signInWithPassword({email,password:p});
+ if(result.error){fe('p',result.error.message);return}
+ if(!result.data.session){toast('Check your email to confirm, then log in.',5000);am='old';auth();return}
+ cloudUser=result.data.user;
+ if(n){const {data:existing}=await cloud.from('club_accounts').select('id').eq('slug',s).maybeSingle();if(existing){await cloud.auth.signOut();cloudUser=null;fe('s','That club link is already in use.');return}
+ const {data:club,error}=await cloud.from('club_accounts').insert({owner_id:cloudUser.id,slug:s,name:nm}).select().single();
+ if(error){fe('s',error.message);return}cloudClub=club;
+ const old=ls.get('sq_state_'+s);if(old){await cloud.from('club_data').upsert({club_id:club.id,payload:{state:old,history:ls.get('sq_hist_'+s)||[],life:ls.get('sq_life_'+s)||{}}})}
+ } else {let {data:club,error}=await cloud.from('club_accounts').select('*').eq('owner_id',cloudUser.id).maybeSingle();
+ if(!error&&!club&&cloudUser.user_metadata?.club_slug){const meta=cloudUser.user_metadata;const created=await cloud.from('club_accounts').insert({owner_id:cloudUser.id,slug:meta.club_slug,name:meta.club_name||meta.club_slug}).select().single();club=created.data;error=created.error}
+ if(error||!club){fe('e',error?.message||'No club is linked to this organizer account.');return}cloudClub=club}
+ me=cloudClub.slug;clubs[me]={name:cloudClub.name};await cloudLoad();app();toast(n?'Club created and synced.':'Welcome back!');firstRun();return;
+}
 if(n){const nm=$('#an').value.trim();
 ok=fe('n',nm?'':'Enter a club name.')&ok;
 const taken=!!clubs[s];
@@ -38,7 +65,7 @@ if(clubs[s].alg!=='p2'){const salt=rnd();clubs[s].salt=salt;clubs[s].h=await has
 enter(s,'Welcome back!')}}
 function forgot(){M('Forgot your password?','<p class="mu" style="margin:8px 0 14px;font-size:14px">Your club is saved only in this browser, so a reset link can’t be emailed. You can create a new club, or restore a backup you downloaded earlier.</p><button class="btn" onclick="closeM()">OK</button>')}
 function enter(s,m){me=s;ls.set('sq_me',s);tab='Queue';loadState(s);app();toast(m||'Welcome');firstRun()}
-function out(){S.ov=null;try{renderOv();closeM()}catch(e){}me=null;ls.set('sq_me',null);auth()}
+async function out(){S.ov=null;try{renderOv();closeM()}catch(e){}if(cloudReady){if(adminChannel)await cloud.removeChannel(adminChannel);adminChannel=null;await cloud.auth.signOut();cloudUser=null;cloudClub=null;me=null;auth();return}me=null;ls.set('sq_me',null);auth()}
 // ---------- game logic ----------
 const TABS=['Queue','Players','History'];let tab='Queue';
 const MODES={Balanced:['Balances teams by rating. Avoids repeat matchups.','Recommended'],'Social Mix':['Rotates partners and opponents. Ratings aren’t used.','Improved'],'Skill Separated':['Keeps similar skill levels together.',''],'Winners / Losers':['Winners play winners, losers play losers.','']};
@@ -183,7 +210,7 @@ T(red?2600:4600,mmClose)}
 Object.assign(IC,{Monitor:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',QR:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h3M20 17v4"/>',Trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',Undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',Vol:'<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>',VolOff:'<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6M16 9l6 6"/>',Film:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 8h4M3 12h4M3 16h4M17 8h4M17 12h4M17 16h4"/>',FilmOff:'<rect x="3" y="3" width="18" height="18" rx="2" opacity=".5"/><path d="M7 3v18M17 3v18M3 8h4M3 12h4M3 16h4M17 8h4M17 12h4M17 16h4" opacity=".5"/><path d="M3 3l18 18"/>',Power:'<path d="M18.4 6.6a9 9 0 1 1-12.8 0M12 2v10"/>'});
 const PERSIST=['mode','nc','id','pl','courts','un','phase','name','t0','seq','mn','pc','oc','sound','anim','rep','log','size','maxRun','scores','wlNext','speak','voice','rate','to','tl'];
 function freshS(){return{mode:'Balanced',nc:2,id:0,pl:[],courts:[],un:[],phase:'setup',name:'Open Play',q:'',sound:true,t0:0,seq:0,ov:null,shuf:false,_k:'',log:[],pc:{},oc:{},mn:0,size:2,maxRun:0,scores:false,speak:true,voice:'',rate:1,to:11,tl:0}}
-function saveState(){if(TV||!me||typeof S==='undefined')return;const o={};PERSIST.forEach(k=>{o[k]=S[k]});o._t=Date.now();o._v=DATA_V;ls.set('sq_state_'+me,o)}
+function saveState(){if(TV||!me||typeof S==='undefined')return;const o={};PERSIST.forEach(k=>{o[k]=S[k]});o._t=Date.now();o._v=DATA_V;ls.set('sq_state_'+me,o);if(cloudReady&&cloudClub){clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudSave,350)}}
 function loadState(c){const o=scrub(migrate(ls.get('sq_state_'+c)));S=freshS();if(o)PERSIST.forEach(k=>{if(o[k]!==undefined)S[k]=o[k]});if(S.phase=='live')sync();}
 window.addEventListener('pagehide',saveState);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveState()});
 let ubT;
@@ -292,7 +319,7 @@ function lifeClear(k){const L=scrub(ls.get('sq_life_'+me)||{});delete L[k];ls.se
 function resetLifeM(){M('Reset all-time stats?','<p class="mu" style="margin:8px 0 14px">This clears every player’s all-time record on this device. Past sessions in History stay. Back up first if you may want these numbers.</p><div class="row"><button class="btn rd" onclick="ls.set(\'sq_life_\'+me,{});closeM();draw();toast(\'All-time stats reset\')">Reset stats</button><button class="btn g" onclick="closeM()">Cancel</button></div>')}
 function addRos(n){const L=scrub(ls.get('sq_life_'+me)||{}),x=L[n.toLowerCase()];add(n,x?x.r||0:0,false);draw();toast(n+' added to the roster')}
 // ---------- release basics: safety, help, privacy ----------
-const APP_VER='1.0.0',DATA_V=2,BRAND=['Side','Quest'],brandHTML=()=>BRAND[0]+'<i>'+BRAND[1]+'</i>';
+const APP_VER='1.1.0',DATA_V=2,BRAND=['Side','Quest'],brandHTML=()=>BRAND[0]+'<i>'+BRAND[1]+'</i>';
 const baseUrl=()=>location.href.split('#')[0],clubLink=s=>baseUrl()+'#club-'+s;
 let PRE='',TR=null;
 Object.assign(IC,{Help:'<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5M12 17.5h.01"/>'});
@@ -389,6 +416,95 @@ function app(){const c=clubs[me];$('#root').innerHTML=`<div class="shell"><nav c
 <div><header class="top"><h1 id="ttl"></h1><span class="sp"></span><span class="chip"><span class="mono" style="font-size:11px">${me}</span><button style="background:none;border:0;color:var(--mu);padding:0" aria-label="Copy club link" onclick="try{navigator.clipboard.writeText(clubLink('${me}'))}catch(e){};toast('Club link copied')">⧉</button></span></header><main id="v"></main></div></div>`;draw()}
 setInterval(()=>{const now=Date.now();document.querySelectorAll('[data-tm]').forEach(e=>{const t=+e.dataset.tm,lim=+e.dataset.lim||0,el=now-t;e.textContent=tm(t)+(lim?' / '+lim+':00':'');e.classList.toggle('warn',lim>0&&el>=lim*48000&&el<lim*60000);e.classList.toggle('over',lim>0&&el>=lim*60000)});document.querySelectorAll('[data-tw]').forEach(e=>e.textContent=tm(+e.dataset.tw));document.querySelectorAll('[data-clock]').forEach(e=>e.textContent=hm(now));tmAlert(now)},1000);
 function saveFile(name,data,mime){const b=new Blob([data],{type:(mime||'text/plain')+';charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+async function cloudEnter(user){
+ let {data:club,error}=await cloud.from('club_accounts').select('*').eq('owner_id',user.id).maybeSingle();
+ if(!error&&!club&&user.user_metadata?.club_slug){const meta=user.user_metadata;const created=await cloud.from('club_accounts').insert({owner_id:user.id,slug:meta.club_slug,name:meta.club_name||meta.club_slug}).select().single();club=created.data;error=created.error}
+ if(error||!club){await cloud.auth.signOut();cloudUser=null;auth();toast(error?.message||'No club is attached to this account.',4500);return}
+ cloudClub=club;me=club.slug;clubs[me]={name:club.name};await cloudLoad();tab='Queue';app();firstRun();
+}
+function stableJson(value){
+ if(Array.isArray(value))return '['+value.map(stableJson).join(',')+']';
+ if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableJson(value[k])).join(',')+'}';
+ return JSON.stringify(value);
+}
+function cloudFingerprint(payload){
+ if(!payload)return '';
+ const copy=JSON.parse(JSON.stringify(payload));
+ if(copy.state)delete copy.state._t;
+ return stableJson(copy);
+}
+async function cloudLoad(){
+ lastCloudFingerprint='';
+ const {data,error}=await cloud.from('club_data').select('payload').eq('club_id',cloudClub.id).maybeSingle();
+ if(error){toast('Could not load synced club data: '+error.message,5000);loadState(me);return}
+ const payload=data?.payload;
+ if(payload?.state){lastCloudFingerprint=cloudFingerprint(payload);ls.set('sq_state_'+me,payload.state);ls.set('sq_hist_'+me,payload.history||[]);ls.set('sq_life_'+me,payload.life||{})}
+ loadState(me);
+ if(adminChannel)cloud.removeChannel(adminChannel);
+ adminChannel=cloud.channel('club-data-'+cloudClub.id).on('postgres_changes',{event:'*',schema:'public',table:'club_data',filter:'club_id=eq.'+cloudClub.id},async ev=>{
+  const incoming=ev.new?.payload;if(!incoming||!incoming.state)return;
+  const fingerprint=cloudFingerprint(incoming),localPayload={state:ls.get('sq_state_'+me),history:ls.get('sq_hist_'+me)||[],life:ls.get('sq_life_'+me)||{}};
+  if(fingerprint===lastCloudFingerprint||fingerprint===cloudFingerprint(localPayload)){lastCloudFingerprint=fingerprint;return}
+  lastCloudFingerprint=fingerprint;ls.set('sq_state_'+me,incoming.state);ls.set('sq_hist_'+me,incoming.history||[]);ls.set('sq_life_'+me,incoming.life||{});loadState(me);if($('#v'))draw();toast('Club updated from another device');
+ }).subscribe();
+}
+async function cloudSave(){
+ if(!cloudClub||!me)return;
+ const state=ls.get('sq_state_'+me);if(!state)return;
+ const payload={state,history:ls.get('sq_hist_'+me)||[],life:ls.get('sq_life_'+me)||{}};
+ const fingerprint=cloudFingerprint(payload);if(fingerprint===lastCloudFingerprint)return;
+ const {error}=await cloud.from('club_data').upsert({club_id:cloudClub.id,payload},{onConflict:'club_id'});
+ if(error){toast('Cloud save failed: '+error.message,5000);return}
+ lastCloudFingerprint=fingerprint;
+ if(cloudClub.public_enabled)await publishQueue();
+}
+function makePublicPayload(){
+ const playing=(S.courts||[]).map((c,i)=>c.m?{court:i+1,players:[...c.m.a,...c.m.b].map(id=>B_(id)?.n).filter(Boolean)}:null).filter(Boolean);
+ const waiting=q().map((p,i)=>({position:i+1,name:p.n,matches:p.g||0}));
+ return {club:clubs[me]?.name||me,session:S.name||'Open Play',phase:S.phase==='live'?'live':'waiting',waiting,playing,courts:S.nc||S.courts?.length||0,updatedAt:Date.now()};
+}
+async function publishQueue(){
+ if(!cloudReady||!cloudClub?.public_enabled)return;
+ const {error}=await cloud.from('public_queues').upsert({club_id:cloudClub.id,slug:cloudClub.slug,payload:makePublicPayload()},{onConflict:'club_id'});
+ if(error)toast('Queue share update failed: '+error.message,5000);
+}
+async function playerBoot(slug){
+ document.title=BRAND[0]+BRAND[1]+' · Player Queue';
+ if(!cloudReady){$('#root').innerHTML='<main class="auth"><div class="card" style="max-width:620px;margin:auto"><h1>Queue not configured</h1><p class="mu">This site needs its Supabase connection configured before player links can load.</p></div></main>';return}
+ if(!/^[a-z0-9-]{3,60}$/.test(slug||'')){ $('#root').innerHTML='<main class="auth"><div class="card" style="max-width:620px;margin:auto"><h1>Invalid queue link</h1></div></main>';return}
+ $('#root').innerHTML='<main class="auth"><div class="card in" style="max-width:620px;margin:auto"><h1 class="disp">Loading queue…</h1></div></main>';
+ const refresh=async()=>{
+  const {data,error}=await cloud.from('public_queues').select('payload').eq('slug',slug).maybeSingle();
+  if(error||!data){$('#root').innerHTML=`<main class="auth"><div class="card" style="max-width:620px;margin:auto"><div class="logo">${brandHTML()}</div><h1>Queue unavailable</h1><p class="mu">${error?'Could not load this queue. Please try again.':'This club has not shared its queue yet.'}</p></div></main>`;return}
+  const d=data.payload||{};
+  $('#root').innerHTML=`<main class="auth"><section style="width:min(760px,100%);margin:auto"><div class="logo">${brandHTML()}</div><div class="row" style="margin:18px 0 4px"><div><div class="mu">${esc(d.club||'Pickleball club')}</div><h1 class="disp" style="margin:0">${esc(d.session||'Open Play')}</h1></div><span class="sp"></span><span class="sb-live"><i class="live"></i>${d.phase==='live'?'Live':'Queue'}</span></div><p class="mu" style="font-size:12px">Updated ${d.updatedAt?new Date(d.updatedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'just now'} · refreshes automatically</p>${d.playing?.length?`<div class="card" style="margin-top:16px"><h2>On court</h2>${d.playing.map(c=>`<div class="qr"><b class="rk">${c.court}</b><span>${c.players.map(esc).join(' · ')}</span></div>`).join('')}</div>`:''}<div class="card" style="margin-top:16px;padding:0;overflow:hidden"><div class="qh"><b>Waiting queue</b><span class="sp"></span><span class="mu">${d.waiting?.length||0} players</span></div>${d.waiting?.length?d.waiting.map(p=>`<div class="qr"><span class="rk">${p.position}</span><b>${esc(p.name)}</b><span class="sp"></span><span class="mu">${p.matches} ${p.matches===1?'match':'matches'}</span></div>`).join(''):'<p class="mu" style="padding:16px">Nobody is waiting right now.</p>'}</div><p class="mu" style="text-align:center;font-size:12px;margin-top:18px">Shared by the club organizer · SideQuest</p></section></main>`;
+ };
+ await refresh();
+ if(cloudChannel)cloud.removeChannel(cloudChannel);
+ cloudChannel=cloud.channel('public-queue-'+slug).on('postgres_changes',{event:'*',schema:'public',table:'public_queues',filter:'slug=eq.'+slug},refresh).subscribe();
+}
+async function forgot(){
+ if(!cloudReady){M('Forgot your password?','<p class="mu" style="margin:8px 0 14px;font-size:14px">This local account has no password reset service. Download a backup before creating a new club.</p><button class="btn" onclick="closeM()">OK</button>');return}
+ const email=$('#ae')?.value.trim();if(!email){fe('e','Enter your organizer email first.');return}
+ const {error}=await cloud.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});toast(error?error.message:'Password reset email sent.',4500);
+}
+function passwordResetView(){
+ $('#root').innerHTML=`<main class="auth"><div class="card" style="max-width:460px;margin:auto"><div class="logo">${brandHTML()}</div><h1>Choose a new password</h1><label for="newpw">New password</label><input id="newpw" type="password" autocomplete="new-password" minlength="8"><div class="err" id="e-p"></div><button class="btn" style="width:100%;margin-top:12px" onclick="saveNewPassword()">Update password</button></div></main>`;
+}
+async function saveNewPassword(){const password=$('#newpw').value;if(password.length<8){fe('p','Use at least 8 characters.');return}const{error}=await cloud.auth.updateUser({password});if(error){fe('p',error.message);return}history.replaceState(null,'',location.pathname);cloudUser=(await cloud.auth.getUser()).data.user;await cloudEnter(cloudUser);toast('Password updated')}
+const privacyOriginalM=privacyM;
+function privacyM(first){privacyOriginalM(first);if(cloudReady)document.querySelectorAll('#mdl p').forEach(p=>{if(p.textContent.toLowerCase().includes('in this browser, on this device only'))p.textContent='Stored in your Supabase project and synced to the devices you sign in on. The public queue shows names and queue positions only after you create a player link.'})}
+function qrM(){
+ if(!cloudReady||!cloudClub){const u=baseUrl()+'#kiosk';M('Player check-in QR',`<p class="mu" style="margin:6px 0 12px">This local check-in screen works on this device. Configure Supabase for a live queue link players can open on their own phones.</p><div id="qr" style="background:#fff;padding:12px;border-radius:14px;width:fit-content;margin:auto"></div><p class="mono" style="font-size:12px;text-align:center">${u}</p><button class="btn" style="width:100%" onclick="closeM();S.ov='kiosk';draw()">Open kiosk mode</button>`);makeQR(u);return}
+ M('Share the live queue',`<p class="mu" style="margin:6px 0 12px">Create a public, read-only link players can open on any phone. It shows names, queue order, and active courts.</p><div id="qr" style="background:#fff;padding:12px;border-radius:14px;width:fit-content;margin:auto"></div><div class="row" style="margin-top:12px"><button class="btn" onclick="shareQueue()">Create / refresh player link</button><button class="btn g" onclick="copyQueueLink()">Copy link</button></div><p id="qrlink" class="mono" style="font-size:12px;overflow-wrap:anywhere;text-align:center"></p><p class="mu" style="font-size:12px;margin-bottom:0">Anyone with this link can view this club’s current queue.</p>`);
+ if(cloudClub.public_enabled)showQueueQR();
+}
+function makeQR(url){try{const q=qrcode(0,'M');q.addData(url);q.make();const box=$('#qr');if(!box)return;box.innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true});const svg=box.querySelector('svg');svg.setAttribute('width','180');svg.setAttribute('height','180');svg.setAttribute('role','img');svg.setAttribute('aria-label','QR code for the player queue')}catch(e){const box=$('#qr');if(box)box.textContent='QR could not be generated'}}
+function queueLink(){return location.origin+location.pathname+'?queue='+encodeURIComponent(me)}
+function showQueueQR(){const url=queueLink(),p=$('#qrlink');if(p)p.textContent=url;makeQR(url)}
+async function shareQueue(){const{error}=await cloud.from('club_accounts').update({public_enabled:true}).eq('id',cloudClub.id);if(error){toast(error.message,4500);return}cloudClub.public_enabled=true;await publishQueue();showQueueQR();toast('Player link is ready')}
+async function copyQueueLink(){if(!cloudClub.public_enabled){await shareQueue();if(!cloudClub.public_enabled)return}try{await navigator.clipboard.writeText(queueLink());toast('Player link copied')}catch(e){const p=$('#qrlink');if(p){const range=document.createRange();range.selectNodeContents(p);getSelection().removeAllRanges();getSelection().addRange(range);toast('Select and copy the link')}}}
+
 boot();
 
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));

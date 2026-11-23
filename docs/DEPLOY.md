@@ -2,6 +2,8 @@
 
 SideQuest is a static site. There is no build step and no server code: the repository root is the website.
 
+For organizer accounts and shared player queue links, configure the optional Supabase project first using [the Supabase setup guide](SUPABASE-SETUP.md). The site remains statically hosted; Supabase provides its authentication and database.
+
 ## Vercel (recommended)
 
 1. Push this folder to a new GitHub repository.
