@@ -1,6 +1,6 @@
 # SideQuest
 
-Open-play queue manager for pickleball clubs. Check players in, build fair matches, send them to courts, keep score, and show it all on a TV. It runs entirely in the browser, works offline, and keeps your data on your own device.
+Open-play queue manager for pickleball clubs. Check players in, build fair matches, send them to courts, keep score, and show it all on a TV. Without cloud settings, it runs in the browser and stores data on that device. Configure the optional Supabase backend for organizer accounts, cross-device sync, and shareable live player queues.
 
 [![CI](https://github.com/YOUR-USER/YOUR-REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR-USER/YOUR-REPO/actions/workflows/ci.yml)
 

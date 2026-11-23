@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 1.1.0
+
+### Added
+- Optional Supabase organizer accounts and cloud sync for sessions, history, and player stats.
+- Public read-only player queue links with QR sharing and live updates.
+- Supabase schema with row-level security and setup instructions.
+
+### Fixed
+- Prevent timestamp-only cloud updates from causing repeated cross-device refreshes.
+
 ## 1.0.0
 
 First public release.

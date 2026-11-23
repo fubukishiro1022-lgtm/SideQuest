@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SideQuest · Open-play queue manager for pickleball clubs</title>
-<meta name="description" content="Run open play from one screen: fair matching, live scoring, a TV Live View and results. Works offline. Your data stays on your device.">
+<meta name="description" content="Run pickleball open play with fair matching, live scoring, organizer accounts, optional cloud sync, player queue links and results.">
 <meta name="theme-color" content="#060a14">
 <meta name="color-scheme" content="dark light">
 <link rel="manifest" href="manifest.webmanifest">
@@ -23,6 +23,12 @@
 <div id="root"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="vendor/qrcode.js"></script>
+<script src="assets/config.js"></script>
+<script>
+if (!new URLSearchParams(location.search).has('local') && window.SQ_SUPABASE && window.SQ_SUPABASE.url && window.SQ_SUPABASE.anonKey) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0"><\/script>');
+}
+</script>
 <script src="assets/app.js"></script>
 </body>
 </html>

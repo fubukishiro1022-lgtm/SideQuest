@@ -34,6 +34,8 @@ One global object `S` holds the current club's session and roster. Its persisted
 | `sq_theme`, `sq_priv_ok`, `sq_tour_*` | Preferences and "already seen" flags |
 | `sq_errlog` | Last 20 errors (no personal data) |
 
+When `assets/config.js` has Supabase settings, organizer authentication uses Supabase Auth and `club_data` becomes the cross-device source of truth. The RLS schema is in `supabase/schema.sql`. Public queue links read only the deliberately limited `public_queues` table; players do not receive access to club history, full roster settings, or organizer accounts. Setup instructions are in `docs/SUPABASE-SETUP.md`.
+
 `migrate()` repairs old or damaged saves and `scrub()` removes unsafe characters from names. Both run on every load, backup restore and second-screen update.
 
 ## Matching
